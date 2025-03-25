@@ -427,23 +427,26 @@ function placeMarkers() {
 
         // Set Color Based on Level
         let backgroundColor = 'rgba(128, 128, 128, 0.7)';
-        // Recommendation: Use light text for dark mode contrast
-        let textColor = '#e0e0e0'; // Default text color (light for dark mode)
+        let textColor = 'black'; // *** NEW: Default text color is black ***
 
         switch (treasure.level) {
-            case 1: backgroundColor = 'rgba(0, 0, 255, 0.7)'; break;
-            case 2: backgroundColor = 'rgba(0, 255, 255, 0.7)'; break;
-            case 3: backgroundColor = 'rgba(0, 255, 0, 0.7)'; break;
-            case 4: backgroundColor = 'rgba(255, 255, 0, 0.7)'; break;
-            case 5: backgroundColor = 'rgba(255, 165, 0, 0.7)'; break;
-            case 6: backgroundColor = 'rgba(255, 0, 0, 0.7)'; break;
+            case 1:
+                backgroundColor = 'rgba(0, 0, 255, 0.7)'; // Blue
+                textColor = 'white'; // *** NEW: Set Level 1 text to white ***
+                break;
+            case 2: backgroundColor = 'rgba(0, 255, 255, 0.7)'; break; // Cyan, uses default black text
+            case 3: backgroundColor = 'rgba(0, 255, 0, 0.7)'; break; // Green, uses default black text
+            case 4: backgroundColor = 'rgba(255, 255, 0, 0.7)'; break; // Yellow, uses default black text
+            case 5: backgroundColor = 'rgba(255, 165, 0, 0.7)'; break; // Orange, uses default black text
+            case 6: backgroundColor = 'rgba(255, 0, 0, 0.7)'; break; // Red, uses default black text
             case 7:
-                backgroundColor = 'rgba(0, 0, 0, 0.8)';
+                backgroundColor = 'rgba(0, 0, 0, 0.8)'; // Black
                 textColor = 'white'; // Keep white for level 7
                 break;
+            // default case uses black text as initialized
         }
         marker.style.backgroundColor = backgroundColor;
-        marker.style.color = textColor;
+        marker.style.color = textColor; // Apply the determined text color
 
         // Store data within the element for the popup
         marker.dataset.x = treasure.x;
@@ -477,8 +480,14 @@ function showPopup(event) { // Event object is automatically passed
     // *** NEW: Check if an image name exists and add image tag ***
     if (clickedImageName && clickedImageName !== "") { // Check if imageName is not empty
         const imagePath = `${IMAGE_BASE_PATH}${clickedImageName}`; // Construct full path
-        // Add the image tag with some basic styling
-        contentHTML += `<br><img src="${imagePath}" alt="Supply Image for Level ${clickedLevel}" style="max-width: 100%; height: auto; margin-top: 10px; display: block;">`;
+        // *** NEW: Wrap image in link and constrain size ***
+        contentHTML += `<br>
+          <a href="${imagePath}" target="_blank" rel="noopener noreferrer" title="Click to view full image">
+            <img src="${imagePath}" 
+                 alt="Supply Image for Level ${clickedLevel}" 
+                 style="display: block; max-width: 100%; max-height: 200px; object-fit: contain; margin: 10px auto 0; cursor: pointer;">
+          </a>`;
+        // *** End NEW block ***
     }
     // *** End Image Addition ***
 
