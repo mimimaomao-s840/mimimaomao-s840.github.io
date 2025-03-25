@@ -81,15 +81,19 @@ a:hover {
 .popup {
     display: none;
     position: absolute;
-    background-color: #333; /* Dark background for popup */
-    color: #e0e0e0; /* Light text in popup */
-    border: 1px solid #555; /* Slightly lighter border for popup */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6); /* More pronounced shadow */
+    background-color: #333;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
     padding: 15px;
     border-radius: 5px;
     z-index: 100;
-    min-width: 170px; /* Slightly wider maybe */
-    font-size: 0.95em; /* Slightly smaller font for popup */
+    min-width: 200px; /* Keep or adjust */
+    max-width: 300px; /* *** ADD THIS: Prevents popup getting too wide *** */
+    font-size: 0.95em;
+    /* Optional: Add overflow if content might still be too tall */
+    /* max-height: 80vh; */
+    /* overflow-y: auto; */
 }
 
 #popup-content {
