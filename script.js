@@ -346,8 +346,9 @@ Level,X axis,Y axis,ImageName
 `;
 
 // --- Configuration ---
-const GAME_MAP_MAX_X = 1000; // The maximum X coordinate in your game
-const GAME_MAP_MAX_Y = 1000; // The maximum Y coordinate in your game
+const GAME_MAP_MAX_X = 1000;
+const GAME_MAP_MAX_Y = 1000;
+const IMAGE_BASE_PATH = './images/supplies/'; // Define base path for images
 
 // --- Get HTML Elements ---
 const mapContainer = document.getElementById('map-container');
@@ -355,163 +356,161 @@ const popup = document.getElementById('popup');
 const popupContent = document.getElementById('popup-content');
 const popupCloseButton = document.getElementById('popup-close');
 
-// --- Get Map Display Dimensions ---
-const mapDisplayWidth = mapContainer.offsetWidth;
-const mapDisplayHeight = mapContainer.offsetHeight;
+// --- Get Map Display Dimensions (Consider moving inside or delaying if needed) ---
+let mapDisplayWidth = mapContainer.offsetWidth;
+let mapDisplayHeight = mapContainer.offsetHeight;
 
 // --- Array to hold parsed treasure data ---
-let treasureData = []; // Use 'let' because we will build this array
+let treasureData = [];
 
-// --- Function to Parse CSV Data ---
+// --- Function to Parse CSV Data (MODIFIED) ---
 function parseCSV(data) {
-    const lines = data.trim().split('\n'); // Split into lines, remove leading/trailing whitespace
-    const headers = lines[0].split(','); // Get headers (Level,X axis,Y axis,ImageName)
+    const lines = data.trim().split('\n');
+    // Skip header row by starting loop at 1 or slice:
+    const dataLines = lines.slice(1); // Get all lines except the first
 
     const parsedData = [];
-    for (let i = 1; i < lines.length; i++) { // Start from 1 to skip header row
-        const line = lines[i].trim();
-        if (!line) continue; // Skip empty lines
+    for (let i = 0; i < dataLines.length; i++) {
+        const line = dataLines[i].trim();
+        if (!line) continue;
 
+        // Split by comma, but handle potential commas within quoted fields if necessary
+        // For this specific CSV structure, simple split should work.
         const columns = line.split(',');
 
-        // Basic check for expected number of columns
-        if (columns.length >= 3) {
+        // Expect at least 4 columns now
+        if (columns.length >= 4) {
             try {
-                // Extract and convert to numbers. Use column index.
                 const level = parseInt(columns[0].trim(), 10);
                 const x = parseInt(columns[1].trim(), 10);
                 const y = parseInt(columns[2].trim(), 10);
+                // Get ImageName (column index 3), trim whitespace, and remove surrounding quotes
+                const imageName = columns[3].trim().replace(/^"|"$/g, '');
 
-                // Check if parsing resulted in valid numbers
                 if (!isNaN(level) && !isNaN(x) && !isNaN(y)) {
-                    parsedData.push({ level: level, x: x, y: y });
+                    // Add imageName to the parsed object
+                    parsedData.push({ level: level, x: x, y: y, imageName: imageName });
                 } else {
-                    console.warn(`Skipping line ${i + 1}: Could not parse numbers - ${line}`);
+                    console.warn(`Skipping line ${i + 2}: Could not parse numbers - ${line}`);
                 }
             } catch (error) {
-                console.error(`Error parsing line ${i + 1}: ${line}`, error);
+                console.error(`Error parsing line ${i + 2}: ${line}`, error);
             }
         } else {
-            console.warn(`Skipping line ${i + 1}: Incorrect number of columns - ${line}`);
+            console.warn(`Skipping line ${i + 2}: Incorrect number of columns - ${line}`);
         }
     }
     return parsedData;
 }
 
 
-// --- Function to Create and Place Markers ---
+// --- Function to Create and Place Markers (MODIFIED) ---
 function placeMarkers() {
-    // Clear any existing markers if this function is called again
-    mapContainer.innerHTML = '';
+    mapContainer.innerHTML = ''; // Clear existing markers
+
+    // Update dimensions here in case they weren't ready initially
+    mapDisplayWidth = mapContainer.offsetWidth;
+    mapDisplayHeight = mapContainer.offsetHeight;
 
     treasureData.forEach(treasure => {
-        // Create the marker element (a div)
         const marker = document.createElement('div');
         marker.className = 'treasure-marker';
 
-        // --- Coordinate Calculation (Bottom-Left Origin) ---
-        // Game: (0,0) is bottom-left. X increases right, Y increases up.
-        // Web: (0,0) is top-left. X (left) increases right, Y (top) increases down.
+        // Coordinate Calculation (Bottom-Left Origin)
         const pixelX = (treasure.x / GAME_MAP_MAX_X) * mapDisplayWidth;
         const pixelY = ( (GAME_MAP_MAX_Y - treasure.y) / GAME_MAP_MAX_Y ) * mapDisplayHeight;
-        // --- End Coordinate Calculation ---
 
-        // Adjust position to center the circle on the coordinate
-        const markerSize = 24; // Must match the CSS width/height
+        const markerSize = 24;
         marker.style.left = `${pixelX - (markerSize / 2)}px`;
         marker.style.top = `${pixelY - (markerSize / 2)}px`;
-
-        // Set the text content to the treasure level
         marker.textContent = treasure.level;
 
-        // --- *** NEW: Set Color Based on Level *** ---
-        let backgroundColor = 'rgba(128, 128, 128, 0.7)'; // Default grey
-        let textColor = 'black'; // Default text color
+        // Set Color Based on Level
+        let backgroundColor = 'rgba(128, 128, 128, 0.7)';
+        // Recommendation: Use light text for dark mode contrast
+        let textColor = '#e0e0e0'; // Default text color (light for dark mode)
 
         switch (treasure.level) {
-            case 1:
-                backgroundColor = 'rgba(0, 0, 255, 0.7)'; // Blue
-                break;
-            case 2:
-                backgroundColor = 'rgba(0, 255, 255, 0.7)'; // Cyan
-                break;
-            case 3:
-                backgroundColor = 'rgba(0, 255, 0, 0.7)'; // Green
-                break;
-            case 4:
-                backgroundColor = 'rgba(255, 255, 0, 0.7)'; // Yellow
-                break;
-            case 5:
-                backgroundColor = 'rgba(255, 165, 0, 0.7)'; // Orange
-                break;
-            case 6:
-                backgroundColor = 'rgba(255, 0, 0, 0.7)'; // Red
-                break;
+            case 1: backgroundColor = 'rgba(0, 0, 255, 0.7)'; break;
+            case 2: backgroundColor = 'rgba(0, 255, 255, 0.7)'; break;
+            case 3: backgroundColor = 'rgba(0, 255, 0, 0.7)'; break;
+            case 4: backgroundColor = 'rgba(255, 255, 0, 0.7)'; break;
+            case 5: backgroundColor = 'rgba(255, 165, 0, 0.7)'; break;
+            case 6: backgroundColor = 'rgba(255, 0, 0, 0.7)'; break;
             case 7:
-                backgroundColor = 'rgba(0, 0, 0, 0.8)'; // Black
-                textColor = 'white'; // Set text to white for level 7
+                backgroundColor = 'rgba(0, 0, 0, 0.8)';
+                textColor = 'white'; // Keep white for level 7
                 break;
-            // Add more cases here if you have levels higher than 7
-            // default: // Handled by initial values
-            //     backgroundColor = 'rgba(128, 128, 128, 0.7)';
-            //     textColor = 'black';
         }
-
         marker.style.backgroundColor = backgroundColor;
         marker.style.color = textColor;
-        // --- *** End Color Setting *** ---
-
 
         // Store data within the element for the popup
         marker.dataset.x = treasure.x;
         marker.dataset.y = treasure.y;
-        marker.dataset.level = treasure.level; // Store level too
+        marker.dataset.level = treasure.level;
+        // *** NEW: Store imageName in dataset ***
+        marker.dataset.imageName = treasure.imageName;
 
-        // Add click event listener to show popup
-        marker.addEventListener('click', (event) => {
-            const clickedX = event.target.dataset.x;
-            const clickedY = event.target.dataset.y;
-            const clickedLevel = event.target.dataset.level;
-            showPopup(event, clickedX, clickedY, clickedLevel);
-        });
+        // Add click event listener
+        marker.addEventListener('click', showPopup); // Pass the event to showPopup
 
-        // Add the marker to the map container
         mapContainer.appendChild(marker);
     });
 
     console.log(`Placed ${treasureData.length} markers.`);
 }
 
-// --- Function to Show Popup ---
-function showPopup(event, x, y, level) { // Added level parameter
-    // Set popup content
-    popupContent.innerHTML = `Treasure Info:<br>Level: ${level}<br>Coordinates: (X: ${x}, Y: ${y})`;
+// --- Function to Show Popup (MODIFIED) ---
+function showPopup(event) { // Event object is automatically passed
+    const marker = event.target; // Get the marker that was clicked
 
-    // Position the popup near the click event
-    // Adjustments (-10, +15) are offsets so it doesn't cover the cursor
-    // Make sure popup stays within viewport boundaries (basic check)
-    let popupX = event.pageX - 10;
-    let popupY = event.pageY + 15;
+    // Retrieve data directly from the clicked marker's dataset
+    const clickedX = marker.dataset.x;
+    const clickedY = marker.dataset.y;
+    const clickedLevel = marker.dataset.level;
+    const clickedImageName = marker.dataset.imageName; // Get the image name
 
-    // Basic boundary check (won't work perfectly if map scrolls)
-    if (popupX + popup.offsetWidth > window.innerWidth + window.scrollX) {
-        popupX = window.innerWidth + window.scrollX - popup.offsetWidth - 10;
+    // Start building popup content HTML
+    let contentHTML = `Treasure Info:<br>Level: ${clickedLevel}<br>Coordinates: (X: ${clickedX}, Y: ${clickedY})`;
+
+    // *** NEW: Check if an image name exists and add image tag ***
+    if (clickedImageName && clickedImageName !== "") { // Check if imageName is not empty
+        const imagePath = `${IMAGE_BASE_PATH}${clickedImageName}`; // Construct full path
+        // Add the image tag with some basic styling
+        contentHTML += `<br><img src="${imagePath}" alt="Supply Image for Level ${clickedLevel}" style="max-width: 100%; height: auto; margin-top: 10px; display: block;">`;
     }
-     if (popupY + popup.offsetHeight > window.innerHeight + window.scrollY) {
-        popupY = event.pageY - popup.offsetHeight - 10; // Place above if below screen
-    }
-    if (popupX < window.scrollX) popupX = window.scrollX + 5;
-    if (popupY < window.scrollY) popupY = window.scrollY + 5;
+    // *** End Image Addition ***
+
+    // Set the complete HTML content
+    popupContent.innerHTML = contentHTML;
+
+    // Position the popup near the click event (adjust as needed)
+    let popupX = event.pageX + 10; // Offset slightly from cursor
+    let popupY = event.pageY + 10;
+
+    // Basic boundary check (simplified)
+    const popupRect = popup.getBoundingClientRect(); // Get dimensions *after* content is set (might need slight delay or fixed size)
+    const bodyRect = document.body.getBoundingClientRect();
+
+    // Adjust if too far right (consider scroll)
+     if (popupX + popupRect.width > bodyRect.width + window.scrollX) {
+         popupX = event.pageX - popupRect.width - 10; // Place left of cursor
+     }
+     // Adjust if too far down (consider scroll)
+     if (popupY + popupRect.height > bodyRect.height + window.scrollY) {
+         popupY = event.pageY - popupRect.height - 10; // Place above cursor
+     }
+     // Adjust if too far left/top (less common)
+     if (popupX < window.scrollX) popupX = window.scrollX + 5;
+     if (popupY < window.scrollY) popupY = window.scrollY + 5;
+
 
     popup.style.left = `${popupX}px`;
     popup.style.top = `${popupY}px`;
+    popup.style.display = 'block'; // Make popup visible
 
-
-    // Make popup visible
-    popup.style.display = 'block';
-
-    // Stop the click from propagating to the map (if we add map-wide clicks later)
-    event.stopPropagation();
+    event.stopPropagation(); // Stop click from propagating further
 }
 
 // --- Function to Hide Popup ---
@@ -520,33 +519,26 @@ function hidePopup() {
 }
 
 // --- Event Listeners ---
-// Close popup when the close button is clicked
 popupCloseButton.addEventListener('click', hidePopup);
-
-// Optional: Close popup if clicked anywhere else on the page *except* on another marker
 document.addEventListener('click', (event) => {
-   // Hide if the click is not on a marker and not inside the popup itself
    if (!event.target.closest('.treasure-marker') && !popup.contains(event.target)) {
       hidePopup();
    }
 });
 
-
 // --- Initialisation ---
-// 1. Parse the CSV data
 treasureData = parseCSV(csvData);
 console.log("Parsed Treasure Data:", treasureData);
 
-// 2. Place markers using the parsed data
+// Place markers after ensuring map container has dimensions
 if (mapDisplayWidth > 0 && mapDisplayHeight > 0) {
     placeMarkers();
 } else {
-    // Fallback if map dimensions aren't ready immediately (less common now but safe)
     window.addEventListener('load', () => {
-        // Recalculate dimensions just in case
-        const loadedMapWidth = mapContainer.offsetWidth;
-        const loadedMapHeight = mapContainer.offsetHeight;
-        if (loadedMapWidth > 0 && loadedMapHeight > 0){
+        // Recalculate dimensions on load
+        mapDisplayWidth = mapContainer.offsetWidth;
+        mapDisplayHeight = mapContainer.offsetHeight;
+        if (mapDisplayWidth > 0 && mapDisplayHeight > 0){
              placeMarkers();
         } else {
             console.error("Map container still has zero dimensions after load.");
