@@ -43,6 +43,30 @@
         <button id="popup-close">Close</button>
     </div>
 
+<div id="add-point-modal" class="modal">
+        <div class="modal-content">
+            <h2>Add New Supply Location</h2>
+            <div id="add-coords-display" style="margin-bottom: 15px;">Coordinates: (X: ?, Y: ?)</div>
+
+            <div style="margin-bottom: 10px;">
+                <label for="add-level-input">Level (1-7): </label>
+                <input type="number" id="add-level-input" min="1" max="7" required style="width: 50px; padding: 5px;">
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label for="add-taken-checkbox" style="cursor: pointer;">
+                    <input type="checkbox" id="add-taken-checkbox" style="cursor: pointer;"> Treasure Taken?
+                </label>
+            </div>
+
+            <div id="add-point-error" style="color: #f99; min-height: 1.2em; margin-bottom: 10px;"></div>
+
+            <div class="modal-buttons">
+                <button id="add-confirm-button">Confirm</button>
+                <button id="add-cancel-button">Cancel</button>
+            </div>
+        </div>
+    </div>
     <script src="script.js"></script>
 </body>
 </html>
