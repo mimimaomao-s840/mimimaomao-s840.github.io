@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Last War Season 2 Supply Locations</title>
+    <title>Last War Season 2 Supply Location</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,58 +15,16 @@
       <a href="https://www.lastwartutorial.com/season-2-supply-collections/" target="_blank" rel="noopener noreferrer">lastwartutorial.com</a>,
       <a href="https://www.facebook.com/groups/393661349287833/posts/970345748286054/" target="_blank" rel="noopener noreferrer">Facebook Groups</a>
     </h3>
-
-    <div style="text-align: center; margin-bottom: 20px;">
-        <button id="import-button">Import Status (CSV)</button>
-        <input type="file" id="import-file-input" accept=".csv" style="display: none;">
-        <button id="export-button">Export Status (CSV)</button>
-    </div>
-
-    <div id="manual-update-section" style="text-align: center; margin-bottom: 20px; padding: 15px; border: 1px solid #444; border-radius: 5px;">
-        <label for="manual-x">X:</label>
-        <input type="number" id="manual-x" style="width: 60px; padding: 5px;">
-        <label for="manual-y" style="margin-left: 10px;">Y:</label>
-        <input type="number" id="manual-y" style="width: 60px; padding: 5px;">
-        <label for="manual-taken" style="margin-left: 10px; cursor: pointer;">
-            <input type="checkbox" id="manual-taken" style="cursor: pointer;"> Taken?
-        </label>
-        <button id="manual-update-button" style="margin-left: 15px;">Update Status</button>
-        <div id="manual-update-status" style="margin-top: 5px; font-size: 0.9em; color: #aaa; min-height: 1.2em;"></div>
-    </div>
+  
 
     <div id="map-container">
         </div>
 
     <div id="popup" class="popup">
-        <div id="popup-content">
-            </div>
+        <div id="popup-content"></div>
         <button id="popup-close">Close</button>
     </div>
 
-<div id="add-point-modal" class="modal">
-        <div class="modal-content">
-            <h2>Add New Supply Location</h2>
-            <div id="add-coords-display" style="margin-bottom: 15px;">Coordinates: (X: ?, Y: ?)</div>
-
-            <div style="margin-bottom: 10px;">
-                <label for="add-level-input">Level (1-7): </label>
-                <input type="number" id="add-level-input" min="1" max="7" required style="width: 50px; padding: 5px;">
-            </div>
-
-            <div style="margin-bottom: 15px;">
-                <label for="add-taken-checkbox" style="cursor: pointer;">
-                    <input type="checkbox" id="add-taken-checkbox" style="cursor: pointer;"> Treasure Taken?
-                </label>
-            </div>
-
-            <div id="add-point-error" style="color: #f99; min-height: 1.2em; margin-bottom: 10px;"></div>
-
-            <div class="modal-buttons">
-                <button id="add-confirm-button">Confirm</button>
-                <button id="add-cancel-button">Cancel</button>
-            </div>
-        </div>
-    </div>
     <script src="script.js"></script>
 </body>
 </html>
