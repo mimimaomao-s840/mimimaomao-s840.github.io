@@ -7,7 +7,6 @@ const IMAGE_BASE_PATH = './images/supplies/'; // Path to the folder containing s
 const mapContainer = document.getElementById('map-container');
 const popup = document.getElementById('popup');
 const popupContent = document.getElementById('popup-content');
-// Note: popupTakenSection element was removed from HTML, no longer needed here
 const popupCloseButton = document.getElementById('popup-close');
 const importButton = document.getElementById('import-button');
 const exportButton = document.getElementById('export-button');
@@ -17,6 +16,15 @@ const manualYInput = document.getElementById('manual-y');
 const manualTakenCheckbox = document.getElementById('manual-taken');
 const manualUpdateButton = document.getElementById('manual-update-button');
 const manualUpdateStatus = document.getElementById('manual-update-status');
+// New Modal Elements
+const addPointModal = document.getElementById('add-point-modal');
+const addCoordsDisplay = document.getElementById('add-coords-display');
+const addLevelInput = document.getElementById('add-level-input');
+const addTakenCheckbox = document.getElementById('add-taken-checkbox');
+const addConfirmButton = document.getElementById('add-confirm-button');
+const addCancelButton = document.getElementById('add-cancel-button');
+const addPointError = document.getElementById('add-point-error');
+
 
 // --- Map Display Dimensions (calculated later) ---
 let mapDisplayWidth = 0;
@@ -374,10 +382,9 @@ Level,X axis,Y axis,ImageName
 `;
 
 // --- Function to Parse CSV Data ---
-// Parses the initial built-in CSV or an imported one
 function parseCSV(data, isImport = false) {
     const lines = data.trim().split('\n');
-    if (lines.length < 2) return isImport ? false : []; // Need header + data
+    if (lines.length < 2) return isImport ? false : [];
 
     const headerLine = lines[0].trim().toLowerCase();
     const dataLines = lines.slice(1);
@@ -386,7 +393,7 @@ function parseCSV(data, isImport = false) {
     const importExpectedHeader = expectedHeader + ",taken";
 
     // Basic header check
-    if (isImport && !headerLine.startsWith(importExpectedHeader.split(',').slice(0,4).join(','))) { // Check first 4 cols for import
+    if (isImport && !headerLine.startsWith(importExpectedHeader.split(',').slice(0,4).join(','))) {
         console.error("Import failed: CSV header doesn't match expected format (Level,X axis,Y axis,ImageName,Taken). Found:", headerLine);
         alert("Import failed: CSV header doesn't match expected format.");
         return false;
@@ -397,11 +404,9 @@ function parseCSV(data, isImport = false) {
         return [];
     }
 
-
-    let parseSuccess = true; // Track overall success for import
+    let parseSuccess = true;
     if (!isImport) treasureData = []; // Clear global array ONLY for initial parse
 
-    // Create lookup map only if importing and treasureData exists
     const treasureIndexMap = (isImport && treasureData.length > 0) ? new Map(treasureData.map((t, i) => [`${t.x},${t.y}`, i])) : null;
 
     for (let i = 0; i < dataLines.length; i++) {
@@ -412,7 +417,7 @@ function parseCSV(data, isImport = false) {
         const expectedCount = isImport ? 5 : 4;
         if (columns.length < expectedCount) {
             console.warn(`Skipping line ${i + 2}: Expected ${expectedCount} columns, found ${columns.length} - ${line}`);
-            if (isImport) parseSuccess = false; // Mark import as potentially incomplete
+            if (isImport) parseSuccess = false;
             continue;
         }
 
@@ -420,7 +425,7 @@ function parseCSV(data, isImport = false) {
             const level = parseInt(columns[0].trim(), 10);
             const x = parseInt(columns[1].trim(), 10);
             const y = parseInt(columns[2].trim(), 10);
-            const imageName = columns[3].trim().replace(/^"|"$/g, ''); // Remove surrounding quotes
+            const imageName = columns[3].trim().replace(/^"|"$/g, '');
             let taken = false;
 
             if (isImport) {
@@ -430,7 +435,7 @@ function parseCSV(data, isImport = false) {
                 if (!treasureIndexMap) {
                      console.error("Import error: Cannot update 'taken' status because initial data isn't loaded or parsed.");
                      parseSuccess = false;
-                     continue; // Skip this row
+                     continue;
                 }
 
                 const index = treasureIndexMap.get(`${x},${y}`);
@@ -438,18 +443,17 @@ function parseCSV(data, isImport = false) {
                     treasureData[index].taken = taken; // Update existing item
                 } else {
                     console.warn(`Import warning: Could not find matching treasure for X:${x}, Y:${y} on line ${i + 2}`);
-                    // Optionally: treat non-matching rows as errors? parseSuccess = false;
+                    // parseSuccess = false; // Decide if non-matches are errors
                 }
             } else {
-                // Initial parse: Add new item if numbers are valid
                 if (!isNaN(level) && !isNaN(x) && !isNaN(y)) {
                     treasureData.push({
-                        id: `treasure-${i}`, // Simple unique ID
+                        id: `treasure-${i}`,
                         level: level,
                         x: x,
                         y: y,
                         imageName: imageName,
-                        taken: taken // Initially false
+                        taken: taken
                     });
                 } else {
                     console.warn(`Skipping line ${i + 2} during initial parse: Could not parse numbers - ${line}`);
@@ -465,6 +469,7 @@ function parseCSV(data, isImport = false) {
         console.log(`Import processing finished. Success status: ${parseSuccess}`);
         return parseSuccess;
     } else {
+        // On initial parse, treasureData is already populated directly
         console.log("Parsed Initial Treasure Data:", treasureData);
         return treasureData; // Return the populated array
     }
@@ -472,22 +477,69 @@ function parseCSV(data, isImport = false) {
 
 // --- Function to Update Marker Style Based on 'taken' Status ---
 function updateMarkerStyle(treasureId, isTaken) {
-    // console.log(`Attempting to update style for ${treasureId}: taken=${isTaken}`); // Uncomment for debugging
+    // console.log(`Attempting to update style for ${treasureId}: taken=${isTaken}`); // For debugging
     const markerElement = document.getElementById(treasureId);
     if (markerElement) {
-        // console.log(`Element ${treasureId} found. Applying class 'taken': ${isTaken}`); // Uncomment for debugging
+        // console.log(`Element ${treasureId} found. Applying class 'taken': ${isTaken}`); // For debugging
         if (isTaken) {
             markerElement.classList.add('taken');
         } else {
             markerElement.classList.remove('taken');
         }
     } else {
-        // This might happen if called before element is added to DOM, should be okay if called within placeMarkers
-        // console.warn(`Element ${treasureId} not found during style update.`); // Uncomment for debugging
+        // console.warn(`Element ${treasureId} not found during style update.`); // For debugging
     }
 }
 
-// --- Function to Create and Place Markers ---
+// --- Function to add a SINGLE new marker to the map ---
+function addSingleMarker(treasure) {
+     if (!mapDisplayWidth || !mapDisplayHeight) return;
+
+     const marker = document.createElement('div');
+     marker.className = 'treasure-marker';
+     marker.id = treasure.id;
+
+     // Coordinate Calculation
+     const pixelX = (treasure.x / GAME_MAP_MAX_X) * mapDisplayWidth;
+     const pixelY = ( (GAME_MAP_MAX_Y - treasure.y) / GAME_MAP_MAX_Y ) * mapDisplayHeight;
+     const markerSize = 24;
+     marker.style.left = `${pixelX - (markerSize / 2)}px`;
+     marker.style.top = `${pixelY - (markerSize / 2)}px`;
+     marker.textContent = treasure.level;
+
+     // Set Color Based on Level and Text Color
+     let backgroundColor = 'rgba(128, 128, 128, 0.7)';
+     let textColor = 'black';
+     switch (treasure.level) {
+         case 1: backgroundColor = 'rgba(0, 0, 255, 0.7)'; textColor = 'white'; break;
+         case 2: backgroundColor = 'rgba(0, 255, 255, 0.7)'; break;
+         case 3: backgroundColor = 'rgba(0, 255, 0, 0.7)'; break;
+         case 4: backgroundColor = 'rgba(255, 255, 0, 0.7)'; break;
+         case 5: backgroundColor = 'rgba(255, 165, 0, 0.7)'; break;
+         case 6: backgroundColor = 'rgba(255, 0, 0, 0.7)'; break;
+         case 7: backgroundColor = 'rgba(0, 0, 0, 0.8)'; textColor = 'white'; break;
+     }
+     marker.style.backgroundColor = backgroundColor;
+     marker.style.color = textColor;
+
+     // Store ID for easy lookup in popup
+     marker.dataset.id = treasure.id;
+
+     // Add click event listener (Wrap showPopup to stop propagation)
+     marker.addEventListener('click', (event) => {
+         showPopup(event);
+         event.stopPropagation(); // Prevent map click when marker is clicked
+     });
+
+     // Apply initial 'taken' style
+     updateMarkerStyle(treasure.id, treasure.taken);
+
+     mapContainer.appendChild(marker);
+     console.log(`Added new marker: ${treasure.id}`);
+}
+
+
+// --- Function to Create and Place All Markers ---
 function placeMarkers() {
     mapContainer.innerHTML = ''; // Clear existing markers
     mapDisplayWidth = mapContainer.offsetWidth;
@@ -502,57 +554,22 @@ function placeMarkers() {
         return;
     }
 
-
     treasureData.forEach(treasure => {
-        const marker = document.createElement('div');
-        marker.className = 'treasure-marker';
-        marker.id = treasure.id; // Use unique ID
-
-        // Coordinate Calculation (Bottom-Left Origin)
-        const pixelX = (treasure.x / GAME_MAP_MAX_X) * mapDisplayWidth;
-        const pixelY = ( (GAME_MAP_MAX_Y - treasure.y) / GAME_MAP_MAX_Y ) * mapDisplayHeight;
-        const markerSize = 24;
-        marker.style.left = `${pixelX - (markerSize / 2)}px`;
-        marker.style.top = `${pixelY - (markerSize / 2)}px`;
-        marker.textContent = treasure.level;
-
-        // Set Color Based on Level and Text Color
-        let backgroundColor = 'rgba(128, 128, 128, 0.7)';
-        let textColor = 'black'; // Default black
-        switch (treasure.level) {
-            case 1: backgroundColor = 'rgba(0, 0, 255, 0.7)'; textColor = 'white'; break;
-            case 2: backgroundColor = 'rgba(0, 255, 255, 0.7)'; break; // Uses black text
-            case 3: backgroundColor = 'rgba(0, 255, 0, 0.7)'; break; // Uses black text
-            case 4: backgroundColor = 'rgba(255, 255, 0, 0.7)'; break; // Uses black text
-            case 5: backgroundColor = 'rgba(255, 165, 0, 0.7)'; break; // Uses black text
-            case 6: backgroundColor = 'rgba(255, 0, 0, 0.7)'; break; // Uses black text
-            case 7: backgroundColor = 'rgba(0, 0, 0, 0.8)'; textColor = 'white'; break;
-        }
-        marker.style.backgroundColor = backgroundColor;
-        marker.style.color = textColor;
-
-        // Store ID for easy lookup in popup
-        marker.dataset.id = treasure.id;
-
-        // Add click event listener
-        marker.addEventListener('click', showPopup);
-
-        // Apply initial 'taken' style
-        updateMarkerStyle(treasure.id, treasure.taken);
-
-        mapContainer.appendChild(marker);
+        // Re-use the single marker adding logic
+        addSingleMarker(treasure);
     });
 
-    // console.log(`Placed ${treasureData.length} markers.`); // Less verbose
+    console.log(`Placed ${treasureData.length} markers.`);
 }
 
 
 // --- Function to Show Popup ---
 function showPopup(event) {
-    const marker = event.target;
+    const marker = event.target.closest('.treasure-marker'); // Ensure we get the marker div
+    if (!marker) return; // Exit if click wasn't on a marker or descendant
     const treasureId = marker.dataset.id;
     const treasure = treasureData.find(t => t.id === treasureId);
-    if (!treasure) return; // Should not happen if data is consistent
+    if (!treasure) return;
 
     // 1. Build Info HTML (Coords etc.)
     let infoHTML = `Treasure Info:<br>Level: ${treasure.level}<br>Coordinates: (X: ${treasure.x}, Y: ${treasure.y})`;
@@ -576,8 +593,8 @@ function showPopup(event) {
 
     checkbox.addEventListener('change', (e) => {
         const isChecked = e.target.checked;
-        treasure.taken = isChecked; // Update data object
-        updateMarkerStyle(treasure.id, isChecked); // Update visual style
+        treasure.taken = isChecked;
+        updateMarkerStyle(treasure.id, isChecked);
     });
 
     label.appendChild(checkbox);
@@ -594,7 +611,7 @@ function showPopup(event) {
             <img src="${imagePath}" alt="Supply Image" style="display: block; max-width: 100%; max-height: 200px; object-fit: contain; margin: 10px auto 0; cursor: pointer;">
           </a>`;
         const imgContainer = document.createElement('div');
-        imgContainer.innerHTML = imageHTML; // Use innerHTML to parse link/img easily
+        imgContainer.innerHTML = imageHTML;
         popupContent.appendChild(imgContainer);
     }
 
@@ -603,25 +620,23 @@ function showPopup(event) {
     let popupY = event.pageY + 10;
     popup.style.left = `${popupX}px`;
     popup.style.top = `${popupY}px`;
-    popup.style.display = 'block'; // Show popup *before* measuring for boundary checks
+    popup.style.display = 'block'; // Show popup before measuring
 
-    // Boundary check after displaying
-    requestAnimationFrame(() => { // Allow browser to render popup before measuring
+    requestAnimationFrame(() => { // Allow browser render before measuring
         const popupRect = popup.getBoundingClientRect();
-        const bodyRect = document.body.getBoundingClientRect(); // Use body for viewport dimensions roughly
+        const bodyRect = document.body.getBoundingClientRect();
         let finalX = popupX;
         let finalY = popupY;
-
-        if (popupX + popupRect.width > bodyRect.width + window.scrollX) { finalX = event.pageX - popupRect.width - 10; }
-        if (popupY + popupRect.height > bodyRect.height + window.scrollY) { finalY = event.pageY - popupRect.height - 10; }
+        // Adjust positioning based on viewport and popup size
+        if (popupX + popupRect.width > window.innerWidth + window.scrollX) { finalX = event.pageX - popupRect.width - 10; }
+        if (popupY + popupRect.height > window.innerHeight + window.scrollY) { finalY = event.pageY - popupRect.height - 10; }
         if (finalX < window.scrollX) finalX = window.scrollX + 5;
         if (finalY < window.scrollY) finalY = window.scrollY + 5;
-
         popup.style.left = `${finalX}px`;
         popup.style.top = `${finalY}px`;
     });
 
-    event.stopPropagation();
+    // Note: stopPropagation is handled in the listener attachment in placeMarkers/addSingleMarker
 }
 
 // --- Function to Hide Popup ---
@@ -637,7 +652,7 @@ function exportCSV() {
     }
     const header = "Level,X axis,Y axis,ImageName,Taken";
     const rows = treasureData.map(t => {
-        const imageNameFormatted = `"${t.imageName.replace(/"/g, '""')}"`; // Quote and escape inner quotes
+        const imageNameFormatted = `"${t.imageName.replace(/"/g, '""')}"`;
         const takenFormatted = t.taken ? 'yes' : 'no';
         return [t.level, t.x, t.y, imageNameFormatted, takenFormatted].join(',');
     });
@@ -668,10 +683,10 @@ function handleImport(event) {
         const importedCsvData = e.target.result;
         console.log("Attempting to import CSV data...");
         try {
-            const success = parseCSV(importedCsvData, true); // Update treasureData in place
+            const success = parseCSV(importedCsvData, true); // Update treasureData
             if (success) {
                 console.log("Data parsing successful, treasureData updated.");
-                placeMarkers(); // Re-render map with updated statuses
+                placeMarkers(); // Re-render map
                 alert("Treasure status imported successfully! Map updated.");
             } else {
                 alert("Import finished, but some rows might have issues. Check console for details.");
@@ -680,7 +695,7 @@ function handleImport(event) {
             console.error("Error during import processing:", error);
             alert("An error occurred during import. Please check the CSV format and console.");
         } finally {
-            importFileInput.value = ''; // Reset file input
+            importFileInput.value = '';
         }
     };
     reader.onerror = function(e) {
@@ -696,12 +711,11 @@ function handleManualUpdate() {
     const x = parseInt(manualXInput.value, 10);
     const y = parseInt(manualYInput.value, 10);
     const isTaken = manualTakenCheckbox.checked;
-
-    manualUpdateStatus.textContent = ''; // Clear previous status
+    manualUpdateStatus.textContent = '';
 
     if (isNaN(x) || isNaN(y)) {
         manualUpdateStatus.textContent = "Please enter valid X and Y coordinates.";
-        manualUpdateStatus.style.color = "#f99"; // Error color
+        manualUpdateStatus.style.color = "#f99";
         return;
     }
     const treasureToUpdate = treasureData.find(t => t.x === x && t.y === y);
@@ -710,46 +724,137 @@ function handleManualUpdate() {
         treasureToUpdate.taken = isTaken;
         updateMarkerStyle(treasureToUpdate.id, isTaken);
         manualUpdateStatus.textContent = `Updated status for (${x}, ${y}) to Taken=${isTaken}.`;
-        manualUpdateStatus.style.color = "#9f9"; // Success color
-        // Optionally clear inputs after successful update
-        // manualXInput.value = '';
-        // manualYInput.value = '';
-        // manualTakenCheckbox.checked = false;
+        manualUpdateStatus.style.color = "#9f9";
     } else {
         manualUpdateStatus.textContent = `No treasure found at coordinates (${x}, ${y}).`;
         manualUpdateStatus.style.color = "#f99";
     }
-    setTimeout(() => { manualUpdateStatus.textContent = ''; }, 5000); // Clear status message
+    setTimeout(() => { manualUpdateStatus.textContent = ''; }, 5000);
 }
+
+// --- Helper function to close the Add Point modal ---
+function closeAddPointModal() {
+    addPointModal.style.display = 'none';
+    addPointError.textContent = '';
+}
+
+// --- Function to handle clicks directly on the map ---
+function handleMapClick(event) {
+    if (event.target !== mapContainer) return;
+    hidePopup(); // Close info popup if open
+
+    const rect = mapContainer.getBoundingClientRect();
+    const clickX_pixels = event.clientX - rect.left;
+    const clickY_pixels = event.clientY - rect.top;
+
+    if (clickX_pixels < 0 || clickX_pixels > mapDisplayWidth || clickY_pixels < 0 || clickY_pixels > mapDisplayHeight) return;
+
+    const gameX = mapDisplayWidth > 0 ? Math.max(0, Math.min(GAME_MAP_MAX_X, Math.round((clickX_pixels / mapDisplayWidth) * GAME_MAP_MAX_X))) : 0;
+    const gameY = mapDisplayHeight > 0 ? Math.max(0, Math.min(GAME_MAP_MAX_Y, Math.round((1 - (clickY_pixels / mapDisplayHeight)) * GAME_MAP_MAX_Y))) : 0;
+
+    addCoordsDisplay.textContent = `Coordinates: (X: ${gameX}, Y: ${gameY})`;
+    addLevelInput.value = '';
+    addTakenCheckbox.checked = false;
+    addPointError.textContent = '';
+    addPointModal.dataset.x = gameX;
+    addPointModal.dataset.y = gameY;
+    addPointModal.style.display = 'block';
+}
+
+// --- Function to Handle Confirming the New Point ---
+function handleAddConfirm() {
+    const level = parseInt(addLevelInput.value, 10);
+    const isTaken = addTakenCheckbox.checked;
+    const x = parseInt(addPointModal.dataset.x, 10);
+    const y = parseInt(addPointModal.dataset.y, 10);
+    addPointError.textContent = '';
+
+    if (isNaN(level) || level < 1 || level > 7) {
+        addPointError.textContent = 'Please enter a valid Level (1-7).';
+        return;
+    }
+    if (isNaN(x) || isNaN(y)) {
+        addPointError.textContent = 'Error: Coordinates not found.';
+        return;
+    }
+
+    const existing = treasureData.find(t => t.x === x && t.y === y);
+    if (existing) {
+        if (!confirm(`A treasure already exists at (${x}, ${y}). Overwrite its level and status?`)) {
+            return;
+        }
+        // Update existing
+        existing.level = level;
+        existing.taken = isTaken;
+        const existingMarker = document.getElementById(existing.id);
+        if (existingMarker) {
+            existingMarker.textContent = level;
+            let bgColor = 'rgba(128, 128, 128, 0.7)';
+            let txtColor = 'black';
+            switch (level) {
+                 case 1: bgColor = 'rgba(0, 0, 255, 0.7)'; txtColor = 'white'; break;
+                 case 2: bgColor = 'rgba(0, 255, 255, 0.7)'; break;
+                 case 3: bgColor = 'rgba(0, 255, 0, 0.7)'; break;
+                 case 4: bgColor = 'rgba(255, 255, 0, 0.7)'; break;
+                 case 5: bgColor = 'rgba(255, 165, 0, 0.7)'; break;
+                 case 6: bgColor = 'rgba(255, 0, 0, 0.7)'; break;
+                 case 7: bgColor = 'rgba(0, 0, 0, 0.8)'; txtColor = 'white'; break;
+            }
+            existingMarker.style.backgroundColor = bgColor;
+            existingMarker.style.color = txtColor;
+        }
+        updateMarkerStyle(existing.id, isTaken);
+        console.log(`Updated existing treasure at (${x}, ${y})`);
+    } else {
+        // Create new
+        const newId = `treasure-${Date.now()}`;
+        const newTreasure = { id: newId, level: level, x: x, y: y, imageName: "", taken: isTaken };
+        treasureData.push(newTreasure);
+        addSingleMarker(newTreasure); // Add only the new marker visually
+    }
+    closeAddPointModal();
+}
+
 
 // --- Event Listeners ---
 popupCloseButton.addEventListener('click', hidePopup);
 document.addEventListener('click', (event) => {
-    // Close popup if click is outside marker and outside popup
-    if (!popup.contains(event.target) && !event.target.closest('.treasure-marker')) {
+    if (!popup.contains(event.target) && !event.target.closest('.treasure-marker') && !addPointModal.contains(event.target) && event.target !== importButton && event.target !== exportButton && event.target !== manualUpdateButton && !event.target.closest('#manual-update-section')) {
+       // Close popups if click is truly outside interactive elements
         hidePopup();
+        // Close add modal too if needed, though backdrop click handles it
+        // closeAddPointModal();
     }
 });
 exportButton.addEventListener('click', exportCSV);
-importButton.addEventListener('click', () => importFileInput.click()); // Trigger file input
+importButton.addEventListener('click', () => importFileInput.click());
 importFileInput.addEventListener('change', handleImport);
 manualUpdateButton.addEventListener('click', handleManualUpdate);
+// New Modal Listeners
+mapContainer.addEventListener('click', handleMapClick);
+addConfirmButton.addEventListener('click', handleAddConfirm);
+addCancelButton.addEventListener('click', closeAddPointModal);
+addPointModal.addEventListener('click', (event) => { // Click on backdrop closes modal
+    if (event.target === addPointModal) {
+        closeAddPointModal();
+    }
+});
 
 
 // --- Initialisation Function ---
 function initializeMap() {
-    // Ensure map container has dimensions before placing markers
     mapDisplayWidth = mapContainer.offsetWidth;
     mapDisplayHeight = mapContainer.offsetHeight;
     if (mapDisplayWidth > 0 && mapDisplayHeight > 0){
-        placeMarkers(); // Place markers using the parsed data
+        placeMarkers(); // Place markers using the initially parsed data
     } else {
-        console.error("Map container has zero dimensions on initialization.");
-        // Optionally display an error message to the user
+        console.error("Map container has zero dimensions on initialization attempt.");
+        // Optionally, retry after a short delay or listen for resize
+        // setTimeout(initializeMap, 100); // Basic retry
     }
 }
 
 // --- Run Initial Setup ---
-parseCSV(csvData); // Parse the built-in CSV data first
-// Wait for the DOM to be fully loaded before trying to measure elements and place markers
+parseCSV(csvData); // Parse the built-in CSV data into treasureData first
+// Wait for the DOM to be fully loaded before trying to access/measure elements
 window.addEventListener('DOMContentLoaded', initializeMap);
