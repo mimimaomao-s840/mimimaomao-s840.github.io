@@ -1,3 +1,26 @@
+// --- Configuration ---
+const GAME_MAP_MAX_X = 1000;
+const GAME_MAP_MAX_Y = 1000;
+const IMAGE_BASE_PATH = './images/supplies/';
+
+// --- Get HTML Elements ---
+const mapContainer = document.getElementById('map-container');
+const popup = document.getElementById('popup');
+const popupContent = document.getElementById('popup-content');
+const popupTakenSection = document.getElementById('popup-taken-section'); // Get checkbox area
+const popupCloseButton = document.getElementById('popup-close');
+const importButton = document.getElementById('import-button');         // New
+const exportButton = document.getElementById('export-button');         // New
+const importFileInput = document.getElementById('import-file-input'); // New
+
+// --- Map Display Dimensions ---
+let mapDisplayWidth = mapContainer.offsetWidth;
+let mapDisplayHeight = mapContainer.offsetHeight;
+
+// --- Array to hold parsed treasure data ---
+// Now includes 'taken' status and original index
+let treasureData = []; // Will hold { level, x, y, imageName, taken, id }
+
 // --- Raw CSV Data (Copied from your input) ---
 const csvData = `
 Level,X axis,Y axis,ImageName
@@ -345,78 +368,111 @@ Level,X axis,Y axis,ImageName
 4,723,679,image-97.png
 `;
 
-// --- Configuration ---
-const GAME_MAP_MAX_X = 1000;
-const GAME_MAP_MAX_Y = 1000;
-const IMAGE_BASE_PATH = './images/supplies/'; // Define base path for images
-
-// --- Get HTML Elements ---
-const mapContainer = document.getElementById('map-container');
-const popup = document.getElementById('popup');
-const popupContent = document.getElementById('popup-content');
-const popupCloseButton = document.getElementById('popup-close');
-
-// --- Get Map Display Dimensions (Consider moving inside or delaying if needed) ---
-let mapDisplayWidth = mapContainer.offsetWidth;
-let mapDisplayHeight = mapContainer.offsetHeight;
-
-// --- Array to hold parsed treasure data ---
-let treasureData = [];
-
 // --- Function to Parse CSV Data (MODIFIED) ---
-function parseCSV(data) {
+// Parses the initial built-in CSV or an imported one
+function parseCSV(data, isImport = false) {
     const lines = data.trim().split('\n');
-    // Skip header row by starting loop at 1 or slice:
-    const dataLines = lines.slice(1); // Get all lines except the first
+    const header = lines[0].trim().toLowerCase(); // Use header for flexible column order (optional)
+    const dataLines = lines.slice(1);
 
-    const parsedData = [];
+    const expectedColumns = ["level", "x axis", "y axis", "imagename"];
+    const importExpectedColumns = [...expectedColumns, "taken"]; // Import needs 'taken'
+
+    let parsedData = isImport ? [] : treasureData; // If importing, create new array temporarily
+    if (!isImport) parsedData = []; // Clear global treasureData if it's initial parse
+
+    // Create a map for quick lookups if importing (X,Y -> index)
+    const treasureIndexMap = isImport ? new Map(treasureData.map((t, i) => [`${t.x},${t.y}`, i])) : null;
+
     for (let i = 0; i < dataLines.length; i++) {
         const line = dataLines[i].trim();
         if (!line) continue;
+        const columns = line.split(','); // Simple split, assumes no commas in image names now
 
-        // Split by comma, but handle potential commas within quoted fields if necessary
-        // For this specific CSV structure, simple split should work.
-        const columns = line.split(',');
+        // Check column count based on context
+        const expectedCount = isImport ? importExpectedColumns.length : expectedColumns.length;
+        if (columns.length < expectedCount) {
+            console.warn(`Skipping line ${i + 2}: Expected ${expectedCount} columns, found ${columns.length} - ${line}`);
+            continue;
+        }
 
-        // Expect at least 4 columns now
-        if (columns.length >= 4) {
-            try {
-                const level = parseInt(columns[0].trim(), 10);
-                const x = parseInt(columns[1].trim(), 10);
-                const y = parseInt(columns[2].trim(), 10);
-                // Get ImageName (column index 3), trim whitespace, and remove surrounding quotes
-                const imageName = columns[3].trim().replace(/^"|"$/g, '');
+        try {
+            // Assuming fixed column order for simplicity now:
+            // Level, X, Y, ImageName, Taken (optional)
+            const level = parseInt(columns[0].trim(), 10);
+            const x = parseInt(columns[1].trim(), 10);
+            const y = parseInt(columns[2].trim(), 10);
+            const imageName = columns[3].trim().replace(/^"|"$/g, '');
+            let taken = false; // Default for initial parse
 
+            if (isImport) {
+                // Parse 'taken' status from the 5th column
+                const takenStr = columns[4]?.trim().toLowerCase(); // Use optional chaining
+                taken = (takenStr === 'yes' || takenStr === 'true');
+
+                // Find the existing treasure item by coordinates
+                const index = treasureIndexMap.get(`${x},${y}`);
+                if (index !== undefined && treasureData[index]) {
+                    // Update only the 'taken' status of the existing item
+                    treasureData[index].taken = taken;
+                } else {
+                    console.warn(`Import warning: Could not find matching treasure for X:${x}, Y:${y} on line ${i + 2}`);
+                }
+            } else {
+                // Initial parse: Add new item with default taken status and an ID
                 if (!isNaN(level) && !isNaN(x) && !isNaN(y)) {
-                    // Add imageName to the parsed object
-                    parsedData.push({ level: level, x: x, y: y, imageName: imageName });
+                    parsedData.push({
+                        id: `treasure-${i}`, // Unique ID for marker element
+                        level: level,
+                        x: x,
+                        y: y,
+                        imageName: imageName,
+                        taken: taken // Initially false
+                    });
                 } else {
                     console.warn(`Skipping line ${i + 2}: Could not parse numbers - ${line}`);
                 }
-            } catch (error) {
-                console.error(`Error parsing line ${i + 2}: ${line}`, error);
             }
+        } catch (error) {
+            console.error(`Error parsing line ${i + 2}: ${line}`, error);
+        }
+    } // End for loop
+
+    if (isImport) {
+        console.log("Import finished. Updated 'taken' status.");
+        return true; // Indicate success or handle errors differently
+    } else {
+        treasureData = parsedData; // Assign to global array on initial parse
+        console.log("Parsed Initial Treasure Data:", treasureData);
+        return treasureData;
+    }
+}
+
+// --- Function to Update Marker Style Based on 'taken' Status ---
+function updateMarkerStyle(treasureId, isTaken) {
+    const markerElement = document.getElementById(treasureId);
+    if (markerElement) {
+        if (isTaken) {
+            markerElement.classList.add('taken');
         } else {
-            console.warn(`Skipping line ${i + 2}: Incorrect number of columns - ${line}`);
+            markerElement.classList.remove('taken');
         }
     }
-    return parsedData;
 }
 
 
 // --- Function to Create and Place Markers (MODIFIED) ---
 function placeMarkers() {
     mapContainer.innerHTML = ''; // Clear existing markers
-
-    // Update dimensions here in case they weren't ready initially
     mapDisplayWidth = mapContainer.offsetWidth;
     mapDisplayHeight = mapContainer.offsetHeight;
 
-    treasureData.forEach(treasure => {
+    treasureData.forEach(treasure => { // Use treasure object directly
         const marker = document.createElement('div');
         marker.className = 'treasure-marker';
+        marker.id = treasure.id; // Assign unique ID to marker element
 
-        // Coordinate Calculation (Bottom-Left Origin)
+        // Coordinate Calculation
         const pixelX = (treasure.x / GAME_MAP_MAX_X) * mapDisplayWidth;
         const pixelY = ( (GAME_MAP_MAX_Y - treasure.y) / GAME_MAP_MAX_Y ) * mapDisplayHeight;
 
@@ -427,36 +483,27 @@ function placeMarkers() {
 
         // Set Color Based on Level
         let backgroundColor = 'rgba(128, 128, 128, 0.7)';
-        let textColor = 'black'; // *** NEW: Default text color is black ***
-
+        let textColor = 'black'; // Default black
         switch (treasure.level) {
-            case 1:
-                backgroundColor = 'rgba(0, 0, 255, 0.7)'; // Blue
-                textColor = 'white'; // *** NEW: Set Level 1 text to white ***
-                break;
-            case 2: backgroundColor = 'rgba(0, 255, 255, 0.7)'; break; // Cyan, uses default black text
-            case 3: backgroundColor = 'rgba(0, 255, 0, 0.7)'; break; // Green, uses default black text
-            case 4: backgroundColor = 'rgba(255, 255, 0, 0.7)'; break; // Yellow, uses default black text
-            case 5: backgroundColor = 'rgba(255, 165, 0, 0.7)'; break; // Orange, uses default black text
-            case 6: backgroundColor = 'rgba(255, 0, 0, 0.7)'; break; // Red, uses default black text
-            case 7:
-                backgroundColor = 'rgba(0, 0, 0, 0.8)'; // Black
-                textColor = 'white'; // Keep white for level 7
-                break;
-            // default case uses black text as initialized
+            case 1: backgroundColor = 'rgba(0, 0, 255, 0.7)'; textColor = 'white'; break;
+            case 2: backgroundColor = 'rgba(0, 255, 255, 0.7)'; break;
+            case 3: backgroundColor = 'rgba(0, 255, 0, 0.7)'; break;
+            case 4: backgroundColor = 'rgba(255, 255, 0, 0.7)'; break;
+            case 5: backgroundColor = 'rgba(255, 165, 0, 0.7)'; break;
+            case 6: backgroundColor = 'rgba(255, 0, 0, 0.7)'; break;
+            case 7: backgroundColor = 'rgba(0, 0, 0, 0.8)'; textColor = 'white'; break;
         }
         marker.style.backgroundColor = backgroundColor;
-        marker.style.color = textColor; // Apply the determined text color
+        marker.style.color = textColor;
 
-        // Store data within the element for the popup
-        marker.dataset.x = treasure.x;
-        marker.dataset.y = treasure.y;
-        marker.dataset.level = treasure.level;
-        // *** NEW: Store imageName in dataset ***
-        marker.dataset.imageName = treasure.imageName;
+        // Store data index for easy lookup in popup
+        marker.dataset.id = treasure.id; // Store ID instead of index
 
         // Add click event listener
-        marker.addEventListener('click', showPopup); // Pass the event to showPopup
+        marker.addEventListener('click', showPopup);
+
+        // *** NEW: Apply initial 'taken' style ***
+        updateMarkerStyle(treasure.id, treasure.taken);
 
         mapContainer.appendChild(marker);
     });
@@ -464,62 +511,73 @@ function placeMarkers() {
     console.log(`Placed ${treasureData.length} markers.`);
 }
 
+
 // --- Function to Show Popup (MODIFIED) ---
-function showPopup(event) { // Event object is automatically passed
-    const marker = event.target; // Get the marker that was clicked
+function showPopup(event) {
+    const marker = event.target;
+    const treasureId = marker.dataset.id; // Get ID from marker
 
-    // Retrieve data directly from the clicked marker's dataset
-    const clickedX = marker.dataset.x;
-    const clickedY = marker.dataset.y;
-    const clickedLevel = marker.dataset.level;
-    const clickedImageName = marker.dataset.imageName; // Get the image name
+    // Find the treasure object in our main array using the ID
+    const treasure = treasureData.find(t => t.id === treasureId);
+    if (!treasure) {
+        console.error("Could not find treasure data for ID:", treasureId);
+        return;
+    }
 
-    // Start building popup content HTML
-    let contentHTML = `Treasure Info:<br>Level: ${clickedLevel}<br>Coordinates: (X: ${clickedX}, Y: ${clickedY})`;
-
-    // *** NEW: Check if an image name exists and add image tag ***
-    if (clickedImageName && clickedImageName !== "") { // Check if imageName is not empty
-        const imagePath = `${IMAGE_BASE_PATH}${clickedImageName}`; // Construct full path
-        // *** NEW: Wrap image in link and constrain size ***
+    // --- Popup Content ---
+    let contentHTML = `Treasure Info:<br>Level: ${treasure.level}<br>Coordinates: (X: ${treasure.x}, Y: ${treasure.y})`;
+    if (treasure.imageName && treasure.imageName !== "") {
+        const imagePath = `${IMAGE_BASE_PATH}${treasure.imageName}`;
         contentHTML += `<br>
           <a href="${imagePath}" target="_blank" rel="noopener noreferrer" title="Click to view full image">
-            <img src="${imagePath}" 
-                 alt="Supply Image for Level ${clickedLevel}" 
-                 style="display: block; max-width: 100%; max-height: 200px; object-fit: contain; margin: 10px auto 0; cursor: pointer;">
+            <img src="${imagePath}" alt="Supply Image" style="display: block; max-width: 100%; max-height: 200px; object-fit: contain; margin: 10px auto 0; cursor: pointer;">
           </a>`;
-        // *** End NEW block ***
     }
-    // *** End Image Addition ***
-
-    // Set the complete HTML content
     popupContent.innerHTML = contentHTML;
 
-    // Position the popup near the click event (adjust as needed)
-    let popupX = event.pageX + 10; // Offset slightly from cursor
+    // --- Popup Taken Checkbox ---
+    popupTakenSection.innerHTML = ''; // Clear previous checkbox
+    const checkboxId = `taken-checkbox-${treasure.id}`;
+    const label = document.createElement('label');
+    label.htmlFor = checkboxId;
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = checkboxId;
+    checkbox.checked = treasure.taken; // Set initial state
+
+    // Add event listener to checkbox
+    checkbox.addEventListener('change', (e) => {
+        const isChecked = e.target.checked;
+        treasure.taken = isChecked; // Update the main data array
+        updateMarkerStyle(treasure.id, isChecked); // Update marker appearance
+        console.log(`Treasure ${treasure.id} marked as taken: ${isChecked}`);
+    });
+
+    label.appendChild(checkbox);
+    label.appendChild(document.createTextNode(' Treasure Taken?'));
+    popupTakenSection.appendChild(label);
+
+    // --- Popup Positioning ---
+    // (Keep existing positioning logic)
+    let popupX = event.pageX + 10;
     let popupY = event.pageY + 10;
+    popup.style.left = `${popupX}px`; // Position first
+    popup.style.top = `${popupY}px`;
+    popup.style.display = 'block'; // Make visible *then* check boundaries
 
-    // Basic boundary check (simplified)
-    const popupRect = popup.getBoundingClientRect(); // Get dimensions *after* content is set (might need slight delay or fixed size)
+    // Boundary check after displaying (more reliable dimensions)
+    const popupRect = popup.getBoundingClientRect();
     const bodyRect = document.body.getBoundingClientRect();
-
-    // Adjust if too far right (consider scroll)
-     if (popupX + popupRect.width > bodyRect.width + window.scrollX) {
-         popupX = event.pageX - popupRect.width - 10; // Place left of cursor
-     }
-     // Adjust if too far down (consider scroll)
-     if (popupY + popupRect.height > bodyRect.height + window.scrollY) {
-         popupY = event.pageY - popupRect.height - 10; // Place above cursor
-     }
-     // Adjust if too far left/top (less common)
-     if (popupX < window.scrollX) popupX = window.scrollX + 5;
-     if (popupY < window.scrollY) popupY = window.scrollY + 5;
-
-
+    if (popupX + popupRect.width > bodyRect.width + window.scrollX) { popupX = event.pageX - popupRect.width - 10; }
+    if (popupY + popupRect.height > bodyRect.height + window.scrollY) { popupY = event.pageY - popupRect.height - 10; }
+    if (popupX < window.scrollX) popupX = window.scrollX + 5;
+    if (popupY < window.scrollY) popupY = window.scrollY + 5;
     popup.style.left = `${popupX}px`;
     popup.style.top = `${popupY}px`;
-    popup.style.display = 'block'; // Make popup visible
 
-    event.stopPropagation(); // Stop click from propagating further
+
+    event.stopPropagation();
 }
 
 // --- Function to Hide Popup ---
@@ -527,31 +585,121 @@ function hidePopup() {
     popup.style.display = 'none';
 }
 
+// --- Function to Export Data to CSV (NEW) ---
+function exportCSV() {
+    if (!treasureData || treasureData.length === 0) {
+        alert("No data available to export.");
+        return;
+    }
+
+    // 1. Create CSV Header
+    const header = "Level,X axis,Y axis,ImageName,Taken"; // Ensure order
+
+    // 2. Create CSV Rows
+    const rows = treasureData.map(t => {
+        // Handle potential commas in imageName by always quoting it
+        const imageNameFormatted = `"${t.imageName.replace(/"/g, '""')}"`; // Escape inner quotes
+        const takenFormatted = t.taken ? 'yes' : 'no';
+        return [t.level, t.x, t.y, imageNameFormatted, takenFormatted].join(',');
+    });
+
+    // 3. Combine Header and Rows
+    const csvContent = [header, ...rows].join('\n');
+
+    // 4. Prompt for Filename
+    const defaultFilename = `treasure-status-${new Date().toISOString().slice(0, 10)}.csv`;
+    const filename = prompt("Enter filename for export:", defaultFilename);
+    if (filename === null) { // User cancelled prompt
+        return;
+    }
+
+    // 5. Create Blob and Download Link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+
+    // 6. Trigger Download and Cleanup
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url); // Clean up blob URL
+
+    console.log("Data exported as:", filename);
+}
+
+// --- Function to Handle File Import (NEW) ---
+function handleImport(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        return; // No file selected
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+        const importedCsvData = e.target.result;
+        try {
+            const success = parseCSV(importedCsvData, true); // Call parseCSV in import mode
+            if (success) {
+                // Re-render markers to reflect updated 'taken' status
+                placeMarkers();
+                alert("Treasure status imported successfully!");
+            } else {
+                alert("Import failed. Check console for details.");
+            }
+        } catch (error) {
+            console.error("Error during import processing:", error);
+            alert("An error occurred during import. Please check the CSV format.");
+        } finally {
+            // Reset file input value to allow importing the same file again
+             importFileInput.value = '';
+        }
+    };
+
+    reader.onerror = function(e) {
+        console.error("Error reading file:", e);
+        alert("Error reading the selected file.");
+        importFileInput.value = ''; // Reset
+    };
+
+    reader.readAsText(file); // Read the file as text
+}
+
 // --- Event Listeners ---
 popupCloseButton.addEventListener('click', hidePopup);
 document.addEventListener('click', (event) => {
-   if (!event.target.closest('.treasure-marker') && !popup.contains(event.target)) {
-      hidePopup();
-   }
+    // Close popup if click is outside marker and outside popup itself
+    if (!popup.contains(event.target) && !event.target.closest('.treasure-marker')) {
+        hidePopup();
+    }
 });
 
-// --- Initialisation ---
-treasureData = parseCSV(csvData);
-console.log("Parsed Treasure Data:", treasureData);
+// New listeners for Import/Export
+exportButton.addEventListener('click', exportCSV);
+importButton.addEventListener('click', () => {
+    importFileInput.click(); // Trigger hidden file input when button is clicked
+});
+importFileInput.addEventListener('change', handleImport); // Handle file selection
 
-// Place markers after ensuring map container has dimensions
-if (mapDisplayWidth > 0 && mapDisplayHeight > 0) {
-    placeMarkers();
-} else {
-    window.addEventListener('load', () => {
-        // Recalculate dimensions on load
-        mapDisplayWidth = mapContainer.offsetWidth;
-        mapDisplayHeight = mapContainer.offsetHeight;
-        if (mapDisplayWidth > 0 && mapDisplayHeight > 0){
-             placeMarkers();
-        } else {
-            console.error("Map container still has zero dimensions after load.");
-        }
-    });
-     console.warn("Map container dimensions initially zero. Waiting for window load.");
+
+// --- Initialisation ---
+parseCSV(csvData); // Initial parse of built-in data
+// Place markers after DOM is ready and map container has dimensions
+function initializeMap() {
+    mapDisplayWidth = mapContainer.offsetWidth;
+    mapDisplayHeight = mapContainer.offsetHeight;
+     if (mapDisplayWidth > 0 && mapDisplayHeight > 0){
+         placeMarkers();
+     } else {
+         console.error("Map container has zero dimensions.");
+         // Optionally add a retry mechanism or better error display
+     }
 }
+
+// Use DOMContentLoaded or window.onload to ensure elements are ready
+window.addEventListener('DOMContentLoaded', initializeMap);
+// Fallback or if dimensions depend on images loading
+// window.addEventListener('load', initializeMap); // Could cause double call if DOMContentLoaded is enough
