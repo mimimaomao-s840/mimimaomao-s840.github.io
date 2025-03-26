@@ -7,7 +7,6 @@ const IMAGE_BASE_PATH = './images/supplies/';
 const mapContainer = document.getElementById('map-container');
 const popup = document.getElementById('popup');
 const popupContent = document.getElementById('popup-content');
-const popupTakenSection = document.getElementById('popup-taken-section'); // Get checkbox area
 const popupCloseButton = document.getElementById('popup-close');
 const importButton = document.getElementById('import-button');         // New
 const exportButton = document.getElementById('export-button');         // New
@@ -448,6 +447,49 @@ function parseCSV(data, isImport = false) {
     }
 }
 
+// --- Get References to New Manual Input Elements (add with other getElementById calls) ---
+const manualXInput = document.getElementById('manual-x');
+const manualYInput = document.getElementById('manual-y');
+const manualTakenCheckbox = document.getElementById('manual-taken');
+const manualUpdateButton = document.getElementById('manual-update-button');
+const manualUpdateStatus = document.getElementById('manual-update-status');
+
+// --- Function to Handle Manual Update (NEW) ---
+function handleManualUpdate() {
+    const x = parseInt(manualXInput.value, 10);
+    const y = parseInt(manualYInput.value, 10);
+    const isTaken = manualTakenCheckbox.checked;
+
+    if (isNaN(x) || isNaN(y)) {
+        manualUpdateStatus.textContent = "Please enter valid X and Y coordinates.";
+        manualUpdateStatus.style.color = "#f99"; // Error color
+        return;
+    }
+
+    // Find the treasure by coordinates
+    const treasureToUpdate = treasureData.find(t => t.x === x && t.y === y);
+
+    if (treasureToUpdate) {
+        treasureToUpdate.taken = isTaken; // Update the data
+        updateMarkerStyle(treasureToUpdate.id, isTaken); // Update the marker style
+        manualUpdateStatus.textContent = `Updated status for (${x}, ${y}) to Taken=${isTaken}.`;
+        manualUpdateStatus.style.color = "#9f9"; // Success color
+        // Optionally clear inputs
+        // manualXInput.value = '';
+        // manualYInput.value = '';
+        // manualTakenCheckbox.checked = false;
+    } else {
+        manualUpdateStatus.textContent = `No treasure found at coordinates (${x}, ${y}).`;
+        manualUpdateStatus.style.color = "#f99"; // Error color
+    }
+
+    // Clear status message after a few seconds
+    setTimeout(() => { manualUpdateStatus.textContent = ''; }, 5000);
+}
+
+// --- Event Listeners (Add this listener) ---
+manualUpdateButton.addEventListener('click', handleManualUpdate);
+
 // --- Function to Update Marker Style Based on 'taken' Status ---
 function updateMarkerStyle(treasureId, isTaken) {
     const markerElement = document.getElementById(treasureId);
@@ -512,61 +554,67 @@ function placeMarkers() {
 }
 
 
-// --- Function to Show Popup (MODIFIED) ---
+// --- Function to Show Popup (REVISED Checkbox Position) ---
 function showPopup(event) {
     const marker = event.target;
-    const treasureId = marker.dataset.id; // Get ID from marker
-
-    // Find the treasure object in our main array using the ID
+    const treasureId = marker.dataset.id;
     const treasure = treasureData.find(t => t.id === treasureId);
-    if (!treasure) {
-        console.error("Could not find treasure data for ID:", treasureId);
-        return;
-    }
+    if (!treasure) return;
 
-    // --- Popup Content ---
-    let contentHTML = `Treasure Info:<br>Level: ${treasure.level}<br>Coordinates: (X: ${treasure.x}, Y: ${treasure.y})`;
-    if (treasure.imageName && treasure.imageName !== "") {
-        const imagePath = `${IMAGE_BASE_PATH}${treasure.imageName}`;
-        contentHTML += `<br>
-          <a href="${imagePath}" target="_blank" rel="noopener noreferrer" title="Click to view full image">
-            <img src="${imagePath}" alt="Supply Image" style="display: block; max-width: 100%; max-height: 200px; object-fit: contain; margin: 10px auto 0; cursor: pointer;">
-          </a>`;
-    }
-    popupContent.innerHTML = contentHTML;
+    // 1. Build Info HTML (Coords etc.)
+    let infoHTML = `Treasure Info:<br>Level: ${treasure.level}<br>Coordinates: (X: ${treasure.x}, Y: ${treasure.y})`;
+    popupContent.innerHTML = infoHTML; // Set basic info first
 
-    // --- Popup Taken Checkbox ---
-    popupTakenSection.innerHTML = ''; // Clear previous checkbox
+    // 2. Create Checkbox Element, Label, and Add Listener
     const checkboxId = `taken-checkbox-${treasure.id}`;
     const label = document.createElement('label');
     label.htmlFor = checkboxId;
+    label.style.display = 'flex';
+    label.style.alignItems = 'center';
+    label.style.marginTop = '10px'; // Space above checkbox
+    label.style.cursor = 'pointer';
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.id = checkboxId;
-    checkbox.checked = treasure.taken; // Set initial state
+    checkbox.checked = treasure.taken;
+    checkbox.style.marginRight = '8px';
+    checkbox.style.cursor = 'pointer';
 
-    // Add event listener to checkbox
     checkbox.addEventListener('change', (e) => {
         const isChecked = e.target.checked;
-        treasure.taken = isChecked; // Update the main data array
-        updateMarkerStyle(treasure.id, isChecked); // Update marker appearance
-        console.log(`Treasure ${treasure.id} marked as taken: ${isChecked}`);
+        treasure.taken = isChecked; // Update data
+        updateMarkerStyle(treasure.id, isChecked); // Update style
     });
 
     label.appendChild(checkbox);
     label.appendChild(document.createTextNode(' Treasure Taken?'));
-    popupTakenSection.appendChild(label);
 
-    // --- Popup Positioning ---
-    // (Keep existing positioning logic)
+    // 3. Append Checkbox/Label to popup content
+    popupContent.appendChild(label);
+
+    // 4. Build and Append Image HTML (if applicable)
+    if (treasure.imageName && treasure.imageName !== "") {
+        const imagePath = `${IMAGE_BASE_PATH}${treasure.imageName}`;
+        const imageHTML = `<br>
+          <a href="${imagePath}" target="_blank" rel="noopener noreferrer" title="Click to view full image">
+            <img src="${imagePath}" alt="Supply Image" style="display: block; max-width: 100%; max-height: 200px; object-fit: contain; margin: 10px auto 0; cursor: pointer;">
+          </a>`;
+        // Append image HTML using a container or directly (careful with event listeners if complex)
+        const imgContainer = document.createElement('div');
+        imgContainer.innerHTML = imageHTML;
+        popupContent.appendChild(imgContainer);
+    }
+
+    // 5. Popup Positioning & Display
+    // (Keep existing positioning logic - showing *after* content set is better)
     let popupX = event.pageX + 10;
     let popupY = event.pageY + 10;
     popup.style.left = `${popupX}px`; // Position first
     popup.style.top = `${popupY}px`;
     popup.style.display = 'block'; // Make visible *then* check boundaries
 
-    // Boundary check after displaying (more reliable dimensions)
+    // Boundary check after displaying
     const popupRect = popup.getBoundingClientRect();
     const bodyRect = document.body.getBoundingClientRect();
     if (popupX + popupRect.width > bodyRect.width + window.scrollX) { popupX = event.pageX - popupRect.width - 10; }
@@ -576,9 +624,12 @@ function showPopup(event) {
     popup.style.left = `${popupX}px`;
     popup.style.top = `${popupY}px`;
 
-
     event.stopPropagation();
 }
+
+// Make sure you DO NOT have a reference like:
+// const popupTakenSection = document.getElementById('popup-taken-section');
+// Delete that line if it exists near the top of script.js
 
 // --- Function to Hide Popup ---
 function hidePopup() {
@@ -630,42 +681,53 @@ function exportCSV() {
     console.log("Data exported as:", filename);
 }
 
-// --- Function to Handle File Import (NEW) ---
+// --- Function to Handle File Import (REVISED) ---
 function handleImport(event) {
     const file = event.target.files[0];
-    if (!file) {
-        return; // No file selected
-    }
+    if (!file) return;
 
     const reader = new FileReader();
 
     reader.onload = function(e) {
         const importedCsvData = e.target.result;
+        console.log("Attempting to import CSV data...");
         try {
-            const success = parseCSV(importedCsvData, true); // Call parseCSV in import mode
+            const success = parseCSV(importedCsvData, true); // Update treasureData in place
             if (success) {
-                // Re-render markers to reflect updated 'taken' status
+                console.log("Data parsing successful, treasureData updated:", treasureData);
+                // Re-render markers which should now reflect the updated 'taken' status
                 placeMarkers();
-                alert("Treasure status imported successfully!");
+                alert("Treasure status imported successfully! Map updated.");
             } else {
-                alert("Import failed. Check console for details.");
+                alert("Import failed during parsing. Check console for details.");
             }
         } catch (error) {
             console.error("Error during import processing:", error);
             alert("An error occurred during import. Please check the CSV format.");
         } finally {
-            // Reset file input value to allow importing the same file again
-             importFileInput.value = '';
+            importFileInput.value = ''; // Reset file input
         }
     };
+    // ... (keep reader.onerror) ...
+    reader.readAsText(file);
+}
 
-    reader.onerror = function(e) {
-        console.error("Error reading file:", e);
-        alert("Error reading the selected file.");
-        importFileInput.value = ''; // Reset
-    };
 
-    reader.readAsText(file); // Read the file as text
+// --- Function to Update Marker Style Based on 'taken' Status (ADD LOGGING) ---
+function updateMarkerStyle(treasureId, isTaken) {
+    // console.log(`Attempting to update style for ${treasureId}: taken=${isTaken}`); // Uncomment for debugging
+    const markerElement = document.getElementById(treasureId);
+    if (markerElement) {
+        // console.log(`Element ${treasureId} found. Applying class 'taken': ${isTaken}`); // Uncomment for debugging
+        if (isTaken) {
+            markerElement.classList.add('taken');
+        } else {
+            markerElement.classList.remove('taken');
+        }
+    } else {
+        // This might happen briefly during a full re-render, should resolve
+        // console.warn(`Element ${treasureId} not found during style update.`); // Uncomment for debugging
+    }
 }
 
 // --- Event Listeners ---
