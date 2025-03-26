@@ -404,6 +404,7 @@ function parseCSV(data) {
 }
 
 
+
 // --- Function to Create and Place Markers (MODIFIED) ---
 function placeMarkers() {
     mapContainer.innerHTML = ''; // Clear existing markers
